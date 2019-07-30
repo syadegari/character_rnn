@@ -45,6 +45,13 @@ def dataSet(text:str, encoder, nBatchSize, nSeqLength, testFrac=0.2):
 
 
 class DataSet:
+    """
+    creates a data set of training and testing out of a given set
+    text -->
+    split_text (train, test) -->
+    clip (so we have sizes of [batch x seq_length] when reshape the data later -->
+    encoded both train and test sets
+    """
     def __init__(self, text:str, batchSize:int, seqLength:int, frac=0.2):
         self.nBatchSize = batchSize
         self.nSeqLength = seqLength
@@ -60,7 +67,14 @@ class DataSet:
         raise TypeError
 
 class DataLoader:
-    def __init__(self, data, nBatchSize, nSeqlength, nLabel, mode='many-many'):
+    """
+    Wrapper around trainset and testset
+    y-values are x-values shifted by 1
+    mode:
+        many-many: y is the same length as x and shifted by 1 : For RNNs that use many-to-many models
+        many-1   : y is the last entry of x (already shifted) : For RNNs that use many-to-one models
+    """
+    def __init__(self, data:str, nBatchSize:int, nSeqlength:int, nLabel:int, mode='many-many'):
         assert mode == 'many-many' or mode == 'many-1'
         self.mode = mode
         self.nBatchSize = nBatchSize
