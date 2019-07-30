@@ -94,7 +94,7 @@ class AbsCharRNN(nn.Module, ABC):
         nLabel = len(self.encoder)
 
         one_hot = one_hot_encode(np.array([self.encoder[ch] for ch in seq])[None, :], nLabel)
-        y, h = self(torch.from_numpy(one_hot), h)
+        y, h = self(torch.from_numpy(one_hot).to(self.device), h)
         h = tuple([_.detach() for _ in h])
         p = F.softmax(y, dim=1)
 
@@ -104,7 +104,14 @@ class AbsCharRNN(nn.Module, ABC):
             p, top_ch = p.topk(top_k)
             top_ch = top_ch.squeeze()
 
-        p = p.detach().squeeze().numpy()
+        # move both p and top_ch to cpu and numpy
+        p = p.detach().squeeze().cpu().numpy()
+        top_ch = top_ch.cpu().numpy()
+        # this is only needed for CharRNNv5 since the output is multiple characters
+        if len(top_ch.shape) > 1:
+            top_ch = top_ch[-1]
+            p = p[-1]
+        #
         return decoder[np.random.choice(top_ch, p=p / np.sum(p))], h
 
 
@@ -144,7 +151,7 @@ class CharRNNv3(AbsCharRNN):
     """hidden variables are averaged using a weight vector alpha.
      requires a constant sequence length for both training and inference (equal to seqLength)"""
     def __init__(self, seqLength, *args, **kwargs):
-        super(CharRNNv3, self).__init__(*args)
+        super(CharRNNv3, self).__init__(*args, **kwargs)
         self.seqLength = seqLength
         self.alpha = nn.Parameter(torch.rand(seqLength, dtype=torch.float, requires_grad=True))
 
@@ -168,5 +175,25 @@ class CharRNNv4(AbsCharRNN):
 
     def __call__(self, x, h0=None):
         hs, hn = self.__lstmPass__(x, h0)
+        hs = hs.contiguous()
+        return self.fc(self.dropout(hs.view(-1, hs.size(2)))), hn
+
+class CharRNNv5(AbsCharRNN):
+    """
+    All hidden variables are passed to the fc layer.
+    Uses a weight vector to average the hidden layers, similar to CharRNNv3
+    """
+
+    def __init__(self, seqLength, *args, **kwargs):
+        super(CharRNNv5, self).__init__(*args, **kwargs)
+        self.seqLength = seqLength
+        self.alpha = nn.Parameter(torch.rand(seqLength, dtype=torch.float, requires_grad=True))
+
+    sample = sample_v2
+
+    def __call__(self, x, h0=None):
+        assert self.seqLength == x.size(1), f'sequence length is {x.size(1)}, must be {self.seqLength}'
+        hs, hn = self.__lstmPass__(x, h0)
+        hs = hs * self.alpha[None, :, None]
         hs = hs.contiguous()
         return self.fc(self.dropout(hs.view(-1, hs.size(2)))), hn
