@@ -107,8 +107,12 @@ class AbsCharRNN(nn.Module, ABC):
         # move both p and top_ch to cpu and numpy
         p = p.detach().squeeze().cpu().numpy()
         top_ch = top_ch.cpu().numpy()
+
+        # removing the additional characters since we only need one vector pair of p, top_ch
         # this is only needed for CharRNNv5 since the output is multiple characters
-        if len(top_ch.shape) > 1:
+        # combination of many-to-many and alpha vector does not allow this model to be queried in a many-to-1 or
+        # 1-to-1 setting
+        if isinstance(self, CharRNNv5):
             top_ch = top_ch[-1]
             p = p[-1]
         #
