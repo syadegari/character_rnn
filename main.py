@@ -14,7 +14,7 @@ with open('data/anna.txt', 'r') as f:
 
 nBatch = 4
 nSeq = 5
-frac = 0.2
+frac = .2
 
 
 dSet = DataSet(text[:20000], nBatch, nSeq, frac)
